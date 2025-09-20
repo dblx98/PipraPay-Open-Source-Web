@@ -21,7 +21,7 @@ You host it on your own server, define your own workflow, install custom plugins
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/PipraPay/piprapay-open-source.git
+   git clone https://github.com/PipraPay/PipraPay-Open-Source-Web.git
    ```
 2. Setup server with PHP, database, web server (Apache/Nginx).
 3. Upload source files to your server.
