@@ -138,8 +138,15 @@ function mfs_initialize_defaults() {
 // Initialize defaults when plugin is first loaded
 mfs_initialize_defaults();
 
+// Load webhook handler
+$webhookHandlerFile = __DIR__ . '/webhook-handler.php';
+if (file_exists($webhookHandlerFile)) {
+    require_once $webhookHandlerFile;
+}
+
 /**
  * Hook into the webhook processing to inject custom providers and formats
+ * This is for backward compatibility if other parts of the system use global variables
  */
 add_action('pp_before_webhook_process', 'mfs_inject_providers');
 
