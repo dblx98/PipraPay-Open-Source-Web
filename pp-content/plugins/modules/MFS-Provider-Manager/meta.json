@@ -1,0 +1,6 @@
+{
+  "type": "plugins",
+  "slug": "mfs-provider-manager",
+  "name": "MFS Provider Manager",
+  "mrdr": "modules"
+}
