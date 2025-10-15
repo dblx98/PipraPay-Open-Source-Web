@@ -8,7 +8,7 @@
  * SETUP INSTRUCTIONS:
  * Add this line to the END of your pp-config.php file:
  * 
- * $mfs_interceptor = __DIR__.'/pp-content/plugins/modules/MFS-Provider-Manager/webhook-interceptor.php';
+ * $mfs_interceptor = __DIR__.'/pp-content/plugins/modules/mfs-provider-manager/webhook-interceptor.php';
  * if (file_exists($mfs_interceptor)) { require_once $mfs_interceptor; }
  * 
  * That's it! Webhooks will now be automatically handled by MFS Provider Manager.
@@ -25,7 +25,7 @@
 if (!isset($_GET['webhook'])) {
     return; // Not a webhook request, do nothing
 }
-
+echo "Webhook detected\n";
 // =============================================================================
 // STEP 2: Verify pp-config.php has been loaded (database credentials available)
 // =============================================================================
@@ -70,7 +70,7 @@ if ($status !== 'active') {
 
 // Load pp-controller.php if not already loaded
 if (!function_exists('connectDatabase')) {
-    $controller_file = __DIR__ . '/../../../pp-include/pp-controller.php';
+    $controller_file = __DIR__ . '/../../../../pp-include/pp-controller.php';
     if (file_exists($controller_file)) {
         require_once $controller_file;
     } else {
@@ -80,7 +80,7 @@ if (!function_exists('connectDatabase')) {
 
 // Load pp-model.php if not already loaded
 if (!function_exists('getData')) {
-    $model_file = __DIR__ . '/../../../pp-include/pp-model.php';
+    $model_file = __DIR__ . '/../../../../pp-include/pp-model.php';
     if (file_exists($model_file)) {
         require_once $model_file;
     } else {

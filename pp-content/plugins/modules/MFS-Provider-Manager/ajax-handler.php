@@ -1,8 +1,8 @@
 <?php
 /**
- * MFS Provider Manager - AJAX Handler
+ * mfs-provider-manager - AJAX Handler
  * 
- * This file handles all AJAX requests for the MFS Provider Manager plugin.
+ * This file handles all AJAX requests for the mfs-provider-manager plugin.
  * It should be called directly via AJAX to avoid HTML output issues.
  */
 
@@ -183,6 +183,26 @@ switch ($action) {
                 'message' => 'You are using the latest version'
             ]);
         }
+        break;
+        
+    case 'auto_configure':
+        // Load the class file if not already loaded
+        if (!function_exists('mfs_auto_configure')) {
+            require_once __DIR__ . '/mfs-provider-manager-class.php';
+        }
+        
+        $result = mfs_auto_configure();
+        echo json_encode($result);
+        break;
+        
+    case 'remove_config':
+        // Load the class file if not already loaded
+        if (!function_exists('mfs_remove_config')) {
+            require_once __DIR__ . '/mfs-provider-manager-class.php';
+        }
+        
+        $result = mfs_remove_config();
+        echo json_encode($result);
         break;
         
     default:

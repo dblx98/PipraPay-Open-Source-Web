@@ -30,150 +30,147 @@ if (file_exists($setupCheckerFile)) {
 }
 
 /**
- * Attempt to automatically configure .htaccess for webhook handling
+ * Attempt to automatically configure pp-config.php for webhook handling
  * 
  * @return array Result with status and message
  */
-function mfs_auto_configure_htaccess() {
-    $htaccess_path = __DIR__ . '/../../../../.htaccess';
+function mfs_auto_configure() {
+    $config_path = __DIR__ . '/../../../../pp-config.php';
     
-    // Check if file exists
-    if (!file_exists($htaccess_path)) {
-        return [
-            'success' => false,
-            'message' => '.htaccess file not found',
-            'can_create' => is_writable(dirname($htaccess_path))
-        ];
+    // Check if file exists, create if it doesn't
+    if (!file_exists($config_path)) {
+        // Create basic pp-config.php file
+        $initial_content = "<?php\n";
+        $initial_content .= "// PipraPay Configuration File\n";
+        $initial_content .= "// Created automatically by mfs-provider-manager\n";
+        $initial_content .= "// Add your database and other configurations here\n\n";
+        
+        if (file_put_contents($config_path, $initial_content) === false) {
+            return [
+                'success' => false,
+                'message' => 'Failed to create pp-config.php file. Please create it manually.'
+            ];
+        }
     }
     
     // Read current content
-    $content = file_get_contents($htaccess_path);
+    $content = file_get_contents($config_path);
     
     // Check if already configured
-    if (strpos($content, 'webhook-endpoint.php') !== false || 
-        strpos($content, 'MFS Provider Manager') !== false) {
+    if (strpos($content, 'webhook-interceptor.php') !== false || 
+        strpos($content, 'mfs-provider-manager') !== false) {
         return [
             'success' => true,
-            'message' => '.htaccess already configured',
+            'message' => 'pp-config.php already configured',
             'already_configured' => true
         ];
     }
     
     // Check if writable
-    if (!is_writable($htaccess_path)) {
+    if (!is_writable($config_path)) {
         return [
             'success' => false,
-            'message' => '.htaccess is not writable',
+            'message' => 'pp-config.php is not writable',
             'can_modify' => false,
-            'permissions' => substr(sprintf('%o', fileperms($htaccess_path)), -4)
+            'permissions' => substr(sprintf('%o', fileperms($config_path)), -4)
         ];
     }
     
-    // Prepare the code to append
-    $webhook_code = "\n\n# =====================================================================\n";
-    $webhook_code .= "# MFS Provider Manager - Automatic Webhook Handler\n";
-    $webhook_code .= "# Added automatically by MFS Provider Manager plugin\n";
-    $webhook_code .= "# =====================================================================\n";
-    $webhook_code .= "RewriteCond %{QUERY_STRING} webhook=([^&]+)\n";
-    $webhook_code .= "RewriteCond %{REQUEST_URI} ^/$ [OR]\n";
-    $webhook_code .= "RewriteCond %{REQUEST_URI} ^/index\\.php$\n";
-    $webhook_code .= "RewriteRule ^ pp-content/plugins/modules/MFS-Provider-Manager/webhook-endpoint.php [L]\n";
-    
-    // Find the position to insert (after RewriteEngine On)
-    $lines = explode("\n", $content);
-    $insert_position = 0;
-    
-    foreach ($lines as $index => $line) {
-        if (stripos($line, 'RewriteEngine On') !== false) {
-            $insert_position = $index + 1;
-            break;
-        }
-    }
-    
-    // Insert the code
-    if ($insert_position > 0) {
-        array_splice($lines, $insert_position, 0, explode("\n", $webhook_code));
-        $new_content = implode("\n", $lines);
-    } else {
-        // If RewriteEngine On not found, append at the end
-        $new_content = $content . $webhook_code;
-    }
+    // Prepare the code to insert
+    $webhook_code = "\n// =====================================================================\n";
+    $webhook_code .= "// mfs-provider-manager - Automatic Webhook Handler\n";
+    $webhook_code .= "// Added automatically by mfs-provider-manager plugin\n";
+    $webhook_code .= "// =====================================================================\n";
+    $webhook_code .= "\$mfs_interceptor = __DIR__.'/pp-content/plugins/modules/MFS-Provider-Manager/webhook-interceptor.php';\n";
+    $webhook_code .= "if (file_exists(\$mfs_interceptor)) {\n";
+    $webhook_code .= "    require_once \$mfs_interceptor;\n";
+    $webhook_code .= "}\n";
     
     // Create backup
-    $backup_path = $htaccess_path . '.mfs-backup-' . date('Y-m-d-His');
-    if (!copy($htaccess_path, $backup_path)) {
+    $backup_path = $config_path . '.mfs-backup-' . date('Y-m-d-His');
+    if (!copy($config_path, $backup_path)) {
         return [
             'success' => false,
             'message' => 'Failed to create backup file'
         ];
     }
     
+    // Check if file ends with closing PHP tag
+    $content_trimmed = rtrim($content);
+    if (substr($content_trimmed, -2) === '?>') {
+        // Insert before the closing tag
+        $new_content = substr($content_trimmed, 0, -2) . $webhook_code . "\n?>";
+    } else {
+        // Just append at the end
+        $new_content = $content . $webhook_code;
+    }
+    
     // Write the new content
-    if (file_put_contents($htaccess_path, $new_content) === false) {
+    if (file_put_contents($config_path, $new_content) === false) {
         return [
             'success' => false,
-            'message' => 'Failed to write to .htaccess'
+            'message' => 'Failed to write to pp-config.php'
         ];
     }
     
     return [
         'success' => true,
-        'message' => '.htaccess configured successfully',
+        'message' => 'pp-config.php configured successfully',
         'backup_created' => $backup_path
     ];
 }
 
 /**
- * Remove MFS configuration from .htaccess
+ * Remove MFS configuration from pp-config.php
  * 
  * @return array Result with status and message
  */
-function mfs_remove_htaccess_config() {
-    $htaccess_path = __DIR__ . '/../../../../.htaccess';
+function mfs_remove_config() {
+    $config_path = __DIR__ . '/../../../../pp-config.php';
     
-    if (!file_exists($htaccess_path)) {
+    if (!file_exists($config_path)) {
         return [
             'success' => false,
-            'message' => '.htaccess file not found'
+            'message' => 'pp-config.php file not found'
         ];
     }
     
-    if (!is_writable($htaccess_path)) {
+    if (!is_writable($config_path)) {
         return [
             'success' => false,
-            'message' => '.htaccess is not writable'
+            'message' => 'pp-config.php is not writable'
         ];
     }
     
-    $content = file_get_contents($htaccess_path);
+    $content = file_get_contents($config_path);
     
     // Check if MFS configuration exists
-    if (strpos($content, 'MFS Provider Manager') === false) {
+    if (strpos($content, 'mfs-provider-manager') === false) {
         return [
             'success' => true,
-            'message' => 'MFS configuration not found in .htaccess',
+            'message' => 'MFS configuration not found in pp-config.php',
             'already_removed' => true
         ];
     }
     
     // Create backup
-    $backup_path = $htaccess_path . '.mfs-backup-' . date('Y-m-d-His');
-    copy($htaccess_path, $backup_path);
+    $backup_path = $config_path . '.mfs-backup-' . date('Y-m-d-His');
+    copy($config_path, $backup_path);
     
-    // Remove MFS configuration block
-    $pattern = '/\n*# ={50,}\n# MFS Provider Manager.*?\nRewriteRule.*?webhook-endpoint\.php.*?\n/s';
+    // Remove MFS configuration block (support both old uppercase and new lowercase)
+    $pattern = '/\n*\/\/ ={50,}\n\/\/ (mfs-provider-manager|MFS Provider Manager).*?require_once.*?;\n}\n/s';
     $new_content = preg_replace($pattern, "\n", $content);
     
-    if (file_put_contents($htaccess_path, $new_content) === false) {
+    if (file_put_contents($config_path, $new_content) === false) {
         return [
             'success' => false,
-            'message' => 'Failed to write to .htaccess'
+            'message' => 'Failed to write to pp-config.php'
         ];
     }
     
     return [
         'success' => true,
-        'message' => 'MFS configuration removed from .htaccess',
+        'message' => 'MFS configuration removed from pp-config.php',
         'backup_created' => $backup_path
     ];
 }
@@ -192,29 +189,6 @@ function mfs_get_setup_status() {
         'info' => []
     ];
     
-    // Check .htaccess
-    $htaccess_path = __DIR__ . '/../../../../.htaccess';
-    if (file_exists($htaccess_path)) {
-        $content = file_get_contents($htaccess_path);
-        
-        if (strpos($content, 'webhook-endpoint.php') !== false) {
-            $status['is_configured'] = true;
-            $status['method'] = 'htaccess';
-            $status['info'][] = '.htaccess method is active';
-        } else {
-            $status['warnings'][] = '.htaccess method not configured';
-        }
-        
-        if (!is_writable($htaccess_path)) {
-            $status['errors'][] = '.htaccess is not writable (chmod needed)';
-            $status['htaccess_writable'] = false;
-        } else {
-            $status['htaccess_writable'] = true;
-        }
-    } else {
-        $status['errors'][] = '.htaccess file not found';
-    }
-    
     // Check pp-config.php
     $config_path = __DIR__ . '/../../../../pp-config.php';
     if (file_exists($config_path)) {
@@ -231,6 +205,7 @@ function mfs_get_setup_status() {
         if (!is_writable($config_path)) {
             $status['warnings'][] = 'pp-config.php is not writable';
             $status['config_writable'] = false;
+            $status['permissions'] = substr(sprintf('%o', fileperms($config_path)), -4);
         } else {
             $status['config_writable'] = true;
         }

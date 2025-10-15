@@ -3,45 +3,8 @@
         die('Direct access not allowed');
     }
 
-    // Handle auto-configuration actions
-    if (isset($_POST['mfs_auto_configure'])) {
-        $result = mfs_auto_configure_htaccess();
-        
-        if ($result['success']) {
-            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">';
-            echo '<strong>Success!</strong> ' . htmlspecialchars($result['message']);
-            if (isset($result['backup_created'])) {
-                echo '<br><small>Backup created: ' . htmlspecialchars(basename($result['backup_created'])) . '</small>';
-            }
-            echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-            echo '</div>';
-        } else {
-            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
-            echo '<strong>Error!</strong> ' . htmlspecialchars($result['message']);
-            if (isset($result['permissions'])) {
-                echo '<br><small>Current permissions: ' . htmlspecialchars($result['permissions']) . '</small>';
-            }
-            echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-            echo '</div>';
-        }
-    }
+    // Handle auto-configuration actions - REMOVED (Now handled via AJAX)
     
-    if (isset($_POST['mfs_remove_config'])) {
-        $result = mfs_remove_htaccess_config();
-        
-        if ($result['success']) {
-            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">';
-            echo '<strong>Success!</strong> ' . htmlspecialchars($result['message']);
-            echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-            echo '</div>';
-        } else {
-            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
-            echo '<strong>Error!</strong> ' . htmlspecialchars($result['message']);
-            echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-            echo '</div>';
-        }
-    }
-
     // Get setup status
     $setup_status = mfs_get_setup_status();
 
@@ -55,6 +18,9 @@
 ?>
 
 <?php if (!$setup_status['is_configured']): ?>
+<!-- Status Messages Container -->
+<div id="mfs-status-messages" class="container-fluid mt-4"></div>
+
 <!-- Setup Wizard - Only show until configured -->
 <div class="container-fluid mt-4 mb-4">
     <div class="card shadow-sm border-warning">
@@ -67,31 +33,28 @@
         <div class="card-body">
             <div class="alert alert-warning mb-3">
                 <strong>⚠️ Automatic webhook handling is not configured yet.</strong><br>
-                Choose one of the options below to enable automatic SMS processing.
+                Configure pp-config.php to enable automatic SMS processing.
             </div>
             
-            <?php if (isset($setup_status['htaccess_writable']) && $setup_status['htaccess_writable']): ?>
-                <!-- Auto-configure .htaccess option (only if writable) -->
+            <?php if (isset($setup_status['config_writable']) && $setup_status['config_writable']): ?>
+                <!-- Auto-configure pp-config.php option (only if writable) -->
                 <div class="card mb-3 border-success">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-lightning-fill text-success"></i> Option 1: Auto-Configure .htaccess (Recommended)</h6>
+                        <h6 class="mb-0"><i class="bi bi-lightning-fill text-success"></i> Auto-Configure pp-config.php (Recommended)</h6>
                     </div>
                     <div class="card-body">
                         <p class="text-muted mb-3">
-                            Click the button below to automatically configure your .htaccess file for webhook handling. 
+                            Click the button below to automatically configure your pp-config.php file for webhook handling. 
                             A backup will be created before any changes.
                         </p>
-                        <form method="post" class="d-inline">
-                            <input type="hidden" name="mfs_auto_configure" value="1">
-                            <button type="submit" class="btn btn-success btn-lg" onclick="return confirm('This will modify your .htaccess file. A backup will be created automatically. Continue?');">
-                                <i class="bi bi-lightning-fill"></i> Auto-Configure Now
-                            </button>
-                        </form>
+                        <button type="button" class="btn btn-success btn-lg" id="autoConfigureBtn">
+                            <i class="bi bi-lightning-fill"></i> Auto-Configure Now
+                        </button>
                         <div class="alert alert-info mt-3 mb-0">
                             <small>
                                 <strong>What this does:</strong><br>
-                                • Creates a backup of your .htaccess file<br>
-                                • Adds webhook rewrite rules<br>
+                                • Creates a backup of your pp-config.php file<br>
+                                • Adds webhook interceptor code<br>
                                 • Enables automatic SMS processing<br>
                                 • Can be removed anytime
                             </small>
@@ -99,74 +62,38 @@
                     </div>
                 </div>
             <?php else: ?>
-                <!-- Manual .htaccess configuration (if not writable) -->
+                <!-- Manual pp-config.php configuration (if not writable) -->
                 <div class="card mb-3 border-warning">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-exclamation-triangle text-warning"></i> Option 1: Manual .htaccess Configuration</h6>
+                        <h6 class="mb-0"><i class="bi bi-exclamation-triangle text-warning"></i> Manual PP-Config Configuration</h6>
                     </div>
                     <div class="card-body">
                         <div class="alert alert-warning">
-                            <strong>⚠️ .htaccess is not writable</strong><br>
+                            <strong>⚠️ pp-config.php is not writable</strong><br>
                             Current permissions: <code><?php echo isset($setup_status['permissions']) ? $setup_status['permissions'] : 'unknown'; ?></code><br>
-                            <small>Run: <code>chmod 644 .htaccess</code> to make it writable, or add the code manually.</small>
+                            <small>Run: <code>chmod 644 pp-config.php</code> to make it writable, or add the code manually.</small>
                         </div>
-                        <p class="text-muted mb-2">Add this code to your .htaccess file (after <code>RewriteEngine On</code>):</p>
-                        <pre class="bg-light p-3 rounded"><code><?php 
-echo htmlspecialchars("# MFS Provider Manager - Automatic Webhook Handler\n");
-echo htmlspecialchars("RewriteCond %{QUERY_STRING} webhook=([^&]+)\n");
-echo htmlspecialchars("RewriteCond %{REQUEST_URI} ^/$ [OR]\n");
-echo htmlspecialchars("RewriteCond %{REQUEST_URI} ^/index\\.php$\n");
-echo htmlspecialchars("RewriteRule ^ pp-content/plugins/modules/MFS-Provider-Manager/webhook-endpoint.php [L]");
-?></code></pre>
-                        <button class="btn btn-secondary" onclick="copyHtaccessCode()">
-                            <i class="bi bi-clipboard"></i> Copy Code
-                        </button>
-                    </div>
-                </div>
-            <?php endif; ?>
-            
-            <!-- Alternative: PP-Config method -->
-            <div class="card border-secondary">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0"><i class="bi bi-code-square text-secondary"></i> Option 2: PP-Config Method (Alternative)</h6>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted mb-2">Add this code to the <strong>END</strong> of your <code>pp-config.php</code> file:</p>
-                    <pre class="bg-light p-3 rounded"><code><?php
+                        <p class="text-muted mb-2">Add this code to the <strong>END</strong> of your <code>pp-config.php</code> file:</p>
+                        <pre class="bg-light p-3 rounded"><code><?php
 $config_code = '$mfs_interceptor = __DIR__.\'/pp-content/plugins/modules/MFS-Provider-Manager/webhook-interceptor.php\';' . "\n";
 $config_code .= 'if (file_exists($mfs_interceptor)) {' . "\n";
 $config_code .= '    require_once $mfs_interceptor;' . "\n";
 $config_code .= '}';
 echo htmlspecialchars($config_code);
 ?></code></pre>
-                    <button class="btn btn-secondary" onclick="copyConfigCode()">
-                        <i class="bi bi-clipboard"></i> Copy Code
-                    </button>
+                        <button class="btn btn-secondary" onclick="copyConfigCode()">
+                            <i class="bi bi-clipboard"></i> Copy Code
+                        </button>
+                    </div>
                 </div>
-            </div>
+            <?php endif; ?>
             
-            <div class="alert alert-info mt-3 mb-0">
-                <strong><i class="bi bi-info-circle"></i> Need help?</strong> 
-                See <code>SETUP-INSTRUCTIONS.md</code> in the module folder for detailed setup guide.
-            </div>
+            
         </div>
     </div>
 </div>
 
 <script>
-function copyHtaccessCode() {
-    const code = `# MFS Provider Manager - Automatic Webhook Handler
-RewriteCond %{QUERY_STRING} webhook=([^&]+)
-RewriteCond %{REQUEST_URI} ^/$ [OR]
-RewriteCond %{REQUEST_URI} ^/index\\.php$
-RewriteRule ^ pp-content/plugins/modules/MFS-Provider-Manager/webhook-endpoint.php [L]`;
-    navigator.clipboard.writeText(code).then(() => {
-        alert('✅ Code copied to clipboard!');
-    }).catch(() => {
-        alert('❌ Failed to copy. Please copy manually.');
-    });
-}
-
 function copyConfigCode() {
     const code = `$mfs_interceptor = __DIR__.'/pp-content/plugins/modules/MFS-Provider-Manager/webhook-interceptor.php';
 if (file_exists($mfs_interceptor)) {
@@ -186,21 +113,18 @@ if (file_exists($mfs_interceptor)) {
 <div class="container-fluid mt-4 mb-3">
     <div class="alert alert-success alert-dismissible fade show" role="alert">
         <strong><i class="bi bi-check-circle-fill"></i> Webhook Setup Complete!</strong>
-        <span class="ms-2 badge bg-success">Active Method: <?php echo ucfirst($setup_status['method']); ?> Integration</span>
+        <span class="ms-2 badge bg-success">Active Method: PP-Config Integration</span>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     
-    <?php if ($setup_status['method'] === 'htaccess' && isset($setup_status['htaccess_writable']) && $setup_status['htaccess_writable']): ?>
+    <?php if (isset($setup_status['config_writable']) && $setup_status['config_writable']): ?>
     <!-- Remove configuration option -->
     <div class="alert alert-light border">
         <small class="text-muted">
             <strong>Remove Configuration:</strong> If you want to remove the webhook handler, you can 
-            <form method="post" class="d-inline">
-                <input type="hidden" name="mfs_remove_config" value="1">
-                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove MFS configuration from .htaccess? A backup will be created.');">
-                    <i class="bi bi-trash"></i> Remove from .htaccess
-                </button>
-            </form>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="removeConfigBtn">
+                <i class="bi bi-trash"></i> Remove from pp-config.php
+            </button>
         </small>
     </div>
     <?php endif; ?>
@@ -489,6 +413,108 @@ if (file_exists($mfs_interceptor)) {
 $(document).ready(function() {
     // Define AJAX endpoint - use separate handler to avoid HTML output
     const ajaxUrl = '<?php echo pp_get_site_url(); ?>/pp-content/plugins/modules/mfs-provider-manager/ajax-handler.php';
+    
+    // Auto-Configure Button
+    $('#autoConfigureBtn').on('click', function() {
+        if (!confirm('This will modify your pp-config.php file. A backup will be created automatically. Continue?')) {
+            return;
+        }
+        
+        const button = $(this);
+        const originalText = button.html();
+        button.html('<span class="spinner-border spinner-border-sm"></span> Configuring...').prop('disabled', true);
+        
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { ajax_action: 'auto_configure' },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    let msg = '<div class="alert alert-success alert-dismissible fade show" role="alert">';
+                    msg += '<strong>Success!</strong> ' + response.message;
+                    if (response.backup_created) {
+                        msg += '<br><small>Backup created: ' + response.backup_created.split('/').pop() + '</small>';
+                    }
+                    msg += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                    msg += '</div>';
+                    $('#mfs-status-messages').html(msg);
+                    
+                    // Reload page after 2 seconds
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    let msg = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+                    msg += '<strong>Error!</strong> ' + response.message;
+                    if (response.permissions) {
+                        msg += '<br><small>Current permissions: ' + response.permissions + '</small>';
+                    }
+                    msg += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                    msg += '</div>';
+                    $('#mfs-status-messages').html(msg);
+                    button.html(originalText).prop('disabled', false);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', xhr.responseText);
+                let msg = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+                msg += '<strong>Error!</strong> An unexpected error occurred. Please try again.';
+                msg += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                msg += '</div>';
+                $('#mfs-status-messages').html(msg);
+                button.html(originalText).prop('disabled', false);
+            }
+        });
+    });
+    
+    // Remove Config Button
+    $('#removeConfigBtn').on('click', function() {
+        if (!confirm('Remove MFS configuration from pp-config.php? A backup will be created.')) {
+            return;
+        }
+        
+        const button = $(this);
+        const originalText = button.html();
+        button.html('<span class="spinner-border spinner-border-sm"></span> Removing...').prop('disabled', true);
+        
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { ajax_action: 'remove_config' },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    let msg = '<div class="alert alert-success alert-dismissible fade show" role="alert">';
+                    msg += '<strong>Success!</strong> ' + response.message;
+                    msg += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                    msg += '</div>';
+                    $('#mfs-status-messages').html(msg);
+                    
+                    // Reload page after 2 seconds
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    let msg = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+                    msg += '<strong>Error!</strong> ' + response.message;
+                    msg += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                    msg += '</div>';
+                    $('#mfs-status-messages').html(msg);
+                    button.html(originalText).prop('disabled', false);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', xhr.responseText);
+                let msg = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+                msg += '<strong>Error!</strong> An unexpected error occurred. Please try again.';
+                msg += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                msg += '</div>';
+                $('#mfs-status-messages').html(msg);
+                button.html(originalText).prop('disabled', false);
+            }
+        });
+    });
     
     // Add Provider
     $('#addProviderForm').on('submit', function(e) {

@@ -12,7 +12,7 @@
  * RewriteCond %{QUERY_STRING} webhook=([^&]+)
  * RewriteCond %{REQUEST_URI} ^/$ [OR]
  * RewriteCond %{REQUEST_URI} ^/index\.php$
- * RewriteRule ^ pp-content/plugins/modules/MFS-Provider-Manager/webhook-endpoint.php [L]
+ * RewriteRule ^ pp-content/plugins/modules/mfs-provider-manager/webhook-endpoint.php [L]
  * 
  * @package MFS Provider Manager
  * @version 1.0.3
@@ -23,10 +23,22 @@
 // STEP 1: Load configuration
 // =============================================================================
 
-$config_file = __DIR__ . '/../../../pp-config.php';
+$config_file = __DIR__ . '/../../../../pp-config.php';
 if (!file_exists($config_file)) {
     http_response_code(500);
-    die(json_encode(['status' => 'false', 'message' => 'Configuration file not found']));
+    die(json_encode([
+        'status' => 'false', 
+        'message' => 'Configuration file not found',
+        'debug' => [
+            '__DIR__' => __DIR__,
+            'config_path' => $config_file,
+            'config_realpath' => realpath($config_file),
+            'config_exists' => file_exists($config_file),
+            'parent_dir' => dirname(__DIR__),
+            'server_document_root' => $_SERVER['DOCUMENT_ROOT'] ?? 'N/A',
+            'script_filename' => $_SERVER['SCRIPT_FILENAME'] ?? 'N/A'
+        ]
+    ], JSON_PRETTY_PRINT));
 }
 
 require_once $config_file;
@@ -35,17 +47,35 @@ require_once $config_file;
 // STEP 2: Load core files
 // =============================================================================
 
-$controller_file = __DIR__ . '/../../../pp-include/pp-controller.php';
+$controller_file = __DIR__ . '/../../../../pp-include/pp-controller.php';
 if (!file_exists($controller_file)) {
     http_response_code(500);
-    die(json_encode(['status' => 'false', 'message' => 'Controller not found']));
+    die(json_encode([
+        'status' => 'false', 
+        'message' => 'Controller not found',
+        'debug' => [
+            '__DIR__' => __DIR__,
+            'controller_path' => $controller_file,
+            'controller_realpath' => realpath($controller_file),
+            'controller_exists' => file_exists($controller_file)
+        ]
+    ], JSON_PRETTY_PRINT));
 }
 require_once $controller_file;
 
-$model_file = __DIR__ . '/../../../pp-include/pp-model.php';
+$model_file = __DIR__ . '/../../../../pp-include/pp-model.php';
 if (!file_exists($model_file)) {
     http_response_code(500);
-    die(json_encode(['status' => 'false', 'message' => 'Model not found']));
+    die(json_encode([
+        'status' => 'false', 
+        'message' => 'Model not found',
+        'debug' => [
+            '__DIR__' => __DIR__,
+            'model_path' => $model_file,
+            'model_realpath' => realpath($model_file),
+            'model_exists' => file_exists($model_file)
+        ]
+    ], JSON_PRETTY_PRINT));
 }
 require_once $model_file;
 
