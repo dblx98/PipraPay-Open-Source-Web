@@ -2437,4 +2437,13 @@
         }
         exit();
     }
+
+    // Load webhook and request routing handlers
+    if (file_exists(__DIR__.'/pp-webhook-handler.php')) {
+        include(__DIR__.'/pp-webhook-handler.php');
+    }
+    
+    if (file_exists(__DIR__.'/pp-request-router.php')) {
+        include(__DIR__.'/pp-request-router.php');
+    }
 ?>
