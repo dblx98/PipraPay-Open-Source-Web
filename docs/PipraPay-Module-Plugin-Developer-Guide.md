@@ -88,6 +88,8 @@ Hooks have no priority or argument count enforcement, so write callbacks that ca
 |------|------------------|-----------|-------------|
 | `pp_cron` | `index.php?cron` | none | Schedule tasks, auto-update checks, queue processing. |
 | `pp_admin_initialize` | Early in `admin/index.php` | none | Inject admin guards (2FA), load extra assets, enforce restrictions. |
+| `pp_webhook_received` | `index.php?webhook=<key>` (before default processing) | `$webhook`, `$_POST`, `$raw_input` | Process incoming webhooks from external services, validate signatures, route webhook events. See [Webhook Processing Plugin Guide](./Webhook-Processing-Plugin-Guide.md). |
+| `pp_webhook_processed` | `index.php?webhook=<key>` (after default processing) | `$webhook`, `$device_status` | React to completed webhook processing, send notifications, log events. |
 | `pp_transaction_ipn` | Multiple transaction updates (manual approval, cron auto-verify, slip upload) | `$transactionId` | Send notifications, push webhooks, reconcile ledgers. |
 | `pp_invoice_ipn` | Invoice status changes (IPN handler, bulk updates, manual edits) | `$invoiceId` | Notify customers, send receipts, sync accounting. |
 | `pp_invoice_initialize` | After invoice theme render (`invoice/index.php`) | none | Inject custom JavaScript, tracking pixels, or preload data when a public invoice is opened. |
@@ -95,6 +97,8 @@ Hooks have no priority or argument count enforcement, so write callbacks that ca
 | `pp_payment_link_initialize` | When a payment link page is shown (`payment-link/index.php`) | none | Inject custom scripts or banner content for payment links. |
 
 > Tip: `pp_transaction_ipn` and `pp_invoice_ipn` are invoked frequently; keep handlers lightweight and fail-safe so they never block the core workflow.
+> 
+> For webhook processing details, see the [Webhook Processing Plugin Guide](./Webhook-Processing-Plugin-Guide.md).
 
 ## Working with Plugin Settings
 Use the helper functions in `pp-include/pp-controller.php`:

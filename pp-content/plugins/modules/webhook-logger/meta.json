@@ -1,0 +1,6 @@
+{
+  "type": "plugins",
+  "slug": "webhook-logger",
+  "name": "Webhook Logger",
+  "mrdr": "modules"
+}

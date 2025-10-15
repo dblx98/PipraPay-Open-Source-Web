@@ -29,6 +29,10 @@
                 }else{
                     $response = json_decode(getData($db_prefix.'settings','WHERE webhook="'.$webhook.'"'),true);
                     if($response['status'] == true){
+                        // Allow plugins to process webhook data first
+                        if (function_exists('pp_trigger_hook')) {
+                            pp_trigger_hook('pp_webhook_received', $webhook, $_POST, file_get_contents('php://input'));
+                        }
                         $d_status = "Pairing";
                         if (isset($_POST['d_model']) && isset($_POST['d_brand']) && isset($_POST['d_version']) && isset($_POST['d_api_level'])) {
                             $d_model = escape_string($_POST['d_model']);
@@ -228,6 +232,10 @@
                             }
                         }
 
+                        // Allow plugins to process webhook data after default processing
+                        if (function_exists('pp_trigger_hook')) {
+                            pp_trigger_hook('pp_webhook_processed', $webhook, $d_status);
+                        }
                         
                         echo json_encode(['status' => "true", 'message' => "Device ".$d_status]);
                         exit();
