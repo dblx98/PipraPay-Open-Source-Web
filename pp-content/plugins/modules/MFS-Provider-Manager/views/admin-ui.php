@@ -3,6 +3,48 @@
         die('Direct access not allowed');
     }
 
+    // Handle auto-configuration actions
+    if (isset($_POST['mfs_auto_configure'])) {
+        $result = mfs_auto_configure_htaccess();
+        
+        if ($result['success']) {
+            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">';
+            echo '<strong>Success!</strong> ' . htmlspecialchars($result['message']);
+            if (isset($result['backup_created'])) {
+                echo '<br><small>Backup created: ' . htmlspecialchars(basename($result['backup_created'])) . '</small>';
+            }
+            echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+            echo '</div>';
+        } else {
+            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+            echo '<strong>Error!</strong> ' . htmlspecialchars($result['message']);
+            if (isset($result['permissions'])) {
+                echo '<br><small>Current permissions: ' . htmlspecialchars($result['permissions']) . '</small>';
+            }
+            echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+            echo '</div>';
+        }
+    }
+    
+    if (isset($_POST['mfs_remove_config'])) {
+        $result = mfs_remove_htaccess_config();
+        
+        if ($result['success']) {
+            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">';
+            echo '<strong>Success!</strong> ' . htmlspecialchars($result['message']);
+            echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+            echo '</div>';
+        } else {
+            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+            echo '<strong>Error!</strong> ' . htmlspecialchars($result['message']);
+            echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+            echo '</div>';
+        }
+    }
+
+    // Get setup status
+    $setup_status = mfs_get_setup_status();
+
     // Get data for display
     $plugin_slug = 'mfs-provider-manager';
     $settings = pp_get_plugin_setting($plugin_slug);
@@ -11,6 +53,159 @@
     $providers = mfs_get_providers();
     $provider_formats = mfs_get_provider_formats();
 ?>
+
+<?php if (!$setup_status['is_configured']): ?>
+<!-- Setup Wizard - Only show until configured -->
+<div class="container-fluid mt-4 mb-4">
+    <div class="card shadow-sm border-warning">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="bi bi-exclamation-triangle-fill"></i> 
+                🚀 Quick Setup Required
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning mb-3">
+                <strong>⚠️ Automatic webhook handling is not configured yet.</strong><br>
+                Choose one of the options below to enable automatic SMS processing.
+            </div>
+            
+            <?php if (isset($setup_status['htaccess_writable']) && $setup_status['htaccess_writable']): ?>
+                <!-- Auto-configure .htaccess option (only if writable) -->
+                <div class="card mb-3 border-success">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-lightning-fill text-success"></i> Option 1: Auto-Configure .htaccess (Recommended)</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            Click the button below to automatically configure your .htaccess file for webhook handling. 
+                            A backup will be created before any changes.
+                        </p>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="mfs_auto_configure" value="1">
+                            <button type="submit" class="btn btn-success btn-lg" onclick="return confirm('This will modify your .htaccess file. A backup will be created automatically. Continue?');">
+                                <i class="bi bi-lightning-fill"></i> Auto-Configure Now
+                            </button>
+                        </form>
+                        <div class="alert alert-info mt-3 mb-0">
+                            <small>
+                                <strong>What this does:</strong><br>
+                                • Creates a backup of your .htaccess file<br>
+                                • Adds webhook rewrite rules<br>
+                                • Enables automatic SMS processing<br>
+                                • Can be removed anytime
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            <?php else: ?>
+                <!-- Manual .htaccess configuration (if not writable) -->
+                <div class="card mb-3 border-warning">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-exclamation-triangle text-warning"></i> Option 1: Manual .htaccess Configuration</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <strong>⚠️ .htaccess is not writable</strong><br>
+                            Current permissions: <code><?php echo isset($setup_status['permissions']) ? $setup_status['permissions'] : 'unknown'; ?></code><br>
+                            <small>Run: <code>chmod 644 .htaccess</code> to make it writable, or add the code manually.</small>
+                        </div>
+                        <p class="text-muted mb-2">Add this code to your .htaccess file (after <code>RewriteEngine On</code>):</p>
+                        <pre class="bg-light p-3 rounded"><code><?php 
+echo htmlspecialchars("# MFS Provider Manager - Automatic Webhook Handler\n");
+echo htmlspecialchars("RewriteCond %{QUERY_STRING} webhook=([^&]+)\n");
+echo htmlspecialchars("RewriteCond %{REQUEST_URI} ^/$ [OR]\n");
+echo htmlspecialchars("RewriteCond %{REQUEST_URI} ^/index\\.php$\n");
+echo htmlspecialchars("RewriteRule ^ pp-content/plugins/modules/MFS-Provider-Manager/webhook-endpoint.php [L]");
+?></code></pre>
+                        <button class="btn btn-secondary" onclick="copyHtaccessCode()">
+                            <i class="bi bi-clipboard"></i> Copy Code
+                        </button>
+                    </div>
+                </div>
+            <?php endif; ?>
+            
+            <!-- Alternative: PP-Config method -->
+            <div class="card border-secondary">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-code-square text-secondary"></i> Option 2: PP-Config Method (Alternative)</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-2">Add this code to the <strong>END</strong> of your <code>pp-config.php</code> file:</p>
+                    <pre class="bg-light p-3 rounded"><code><?php
+$config_code = '$mfs_interceptor = __DIR__.\'/pp-content/plugins/modules/MFS-Provider-Manager/webhook-interceptor.php\';' . "\n";
+$config_code .= 'if (file_exists($mfs_interceptor)) {' . "\n";
+$config_code .= '    require_once $mfs_interceptor;' . "\n";
+$config_code .= '}';
+echo htmlspecialchars($config_code);
+?></code></pre>
+                    <button class="btn btn-secondary" onclick="copyConfigCode()">
+                        <i class="bi bi-clipboard"></i> Copy Code
+                    </button>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3 mb-0">
+                <strong><i class="bi bi-info-circle"></i> Need help?</strong> 
+                See <code>SETUP-INSTRUCTIONS.md</code> in the module folder for detailed setup guide.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyHtaccessCode() {
+    const code = `# MFS Provider Manager - Automatic Webhook Handler
+RewriteCond %{QUERY_STRING} webhook=([^&]+)
+RewriteCond %{REQUEST_URI} ^/$ [OR]
+RewriteCond %{REQUEST_URI} ^/index\\.php$
+RewriteRule ^ pp-content/plugins/modules/MFS-Provider-Manager/webhook-endpoint.php [L]`;
+    navigator.clipboard.writeText(code).then(() => {
+        alert('✅ Code copied to clipboard!');
+    }).catch(() => {
+        alert('❌ Failed to copy. Please copy manually.');
+    });
+}
+
+function copyConfigCode() {
+    const code = `$mfs_interceptor = __DIR__.'/pp-content/plugins/modules/MFS-Provider-Manager/webhook-interceptor.php';
+if (file_exists($mfs_interceptor)) {
+    require_once $mfs_interceptor;
+}`;
+    navigator.clipboard.writeText(code).then(() => {
+        alert('✅ Code copied to clipboard!');
+    }).catch(() => {
+        alert('❌ Failed to copy. Please copy manually.');
+    });
+}
+</script>
+<?php endif; ?>
+
+<?php if ($setup_status['is_configured']): ?>
+<!-- Setup Status Badge - Show when configured -->
+<div class="container-fluid mt-4 mb-3">
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong><i class="bi bi-check-circle-fill"></i> Webhook Setup Complete!</strong>
+        <span class="ms-2 badge bg-success">Active Method: <?php echo ucfirst($setup_status['method']); ?> Integration</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    
+    <?php if ($setup_status['method'] === 'htaccess' && isset($setup_status['htaccess_writable']) && $setup_status['htaccess_writable']): ?>
+    <!-- Remove configuration option -->
+    <div class="alert alert-light border">
+        <small class="text-muted">
+            <strong>Remove Configuration:</strong> If you want to remove the webhook handler, you can 
+            <form method="post" class="d-inline">
+                <input type="hidden" name="mfs_remove_config" value="1">
+                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove MFS configuration from .htaccess? A backup will be created.');">
+                    <i class="bi bi-trash"></i> Remove from .htaccess
+                </button>
+            </form>
+        </small>
+    </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <style>
     .provider-card {
